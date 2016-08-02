@@ -717,6 +717,9 @@ endif
 # Always append ALL so that arch config.mk's can add custom ones
 ALL-y += u-boot.srec u-boot.bin System.map binary_size_check
 ALL-y += u-boot.hex
+ifeq ($(CONFIG_NEED_BL301), y)
+ALL-y += bl301.bin
+endif
 ALL-y += fip.bin boot.bin
 ALL-$(CONFIG_ONENAND_U_BOOT) += u-boot-onenand.bin
 ifeq ($(CONFIG_SPL_FSL_PBL),y)
@@ -867,14 +870,36 @@ fip_create:
 	$(Q)cp $(srctree)/tools/fip_create/fip_create $(FIP_FOLDER)/
 
 .PHONY: fip.bin
-fip.bin: tools prepare u-boot.bin fip_create
+ifeq ($(CONFIG_NEED_BL301), y)
+fip.bin: tools prepare acs.bin bl301.bin fip_create
+else
+fip.bin: tools prepare acs.bin fip_create
+endif
 	$(Q)cp u-boot.bin $(FIP_FOLDER_SOC)/bl33.bin
 	$(Q)$(FIP_FOLDER)/fip_create ${FIP_ARGS} $(FIP_FOLDER_SOC)/fip.bin
 	$(Q)$(FIP_FOLDER)/fip_create --dump $(FIP_FOLDER_SOC)/fip.bin
 
+ifeq ($(CONFIG_NEED_BL301), y)
+.PHONY : bl301.bin
+bl301.bin: tools prepare acs.bin
+	$(Q)$(MAKE) -C $(srctree)/$(CPUDIR)/${SOC}/firmware/scp_task
+	$(Q)cp $(buildtree)/scp_task/bl301.bin $(FIP_FOLDER_SOC)/bl301.bin -f
+endif
+
+.PHONY : acs.bin
+acs.bin: tools prepare u-boot.bin
+	$(Q)$(MAKE) -C $(srctree)/$(CPUDIR)/${SOC}/firmware/acs all FIRMWARE=$@
+	$(Q)cp $(buildtree)/board/${BOARDDIR}/firmware/acs.bin $(FIP_FOLDER_SOC)/acs.bin -f
+
 .PHONY : boot.bin
 boot.bin: fip.bin
-	$(Q)cat $(FIP_FOLDER_SOC)/bl2.package  $(FIP_FOLDER_SOC)/fip.bin > $(FIP_FOLDER_SOC)/boot_new.bin
+ifeq ($(CONFIG_AML_UBOOT_AUTO_TEST), y)
+	$(Q)python $(FIP_FOLDER)/acs_tool.pyc $(FIP_FOLDER_SOC)/bl2_utst.bin $(FIP_FOLDER_SOC)/bl2_acs.bin $(FIP_FOLDER_SOC)/acs.bin 0
+else
+	$(Q)python $(FIP_FOLDER)/acs_tool.pyc $(FIP_FOLDER_SOC)/bl2.bin $(FIP_FOLDER_SOC)/bl2_acs.bin $(FIP_FOLDER_SOC)/acs.bin 0
+endif
+	$(Q)$(FIP_FOLDER)/bl2_fix.sh $(FIP_FOLDER_SOC)/bl2_acs.bin $(FIP_FOLDER_SOC)/zero_tmp $(FIP_FOLDER_SOC)/bl2_new.bin
+	$(Q)cat $(FIP_FOLDER_SOC)/bl2_new.bin  $(FIP_FOLDER_SOC)/fip.bin > $(FIP_FOLDER_SOC)/boot_new.bin
 	$(Q)$(FIP_FOLDER_SOC)/aml_encrypt_$(SOC) --bootsig --input $(FIP_FOLDER_SOC)/boot_new.bin --output $(FIP_FOLDER_SOC)/u-boot.bin
 ifeq ($(CONFIG_AML_CRYPTO_UBOOT), y)
 	$(Q)$(FIP_FOLDER_SOC)/aml_encrypt_$(SOC) --bootsig --input $(FIP_FOLDER_SOC)/boot_new.bin --amluserkey $(srctree)/board/$(BOARDDIR)/aml-user-key.sig --aeskey enable --output $(FIP_FOLDER_SOC)/u-boot.bin.encrypt
@@ -885,7 +910,7 @@ ifeq ($(CONFIG_AML_CRYPTO_IMG), y)
 endif
 	@cp -f $(FIP_FOLDER_SOC)/u-boot.* $(FIP_FOLDER)/
 	$(Q)dd if=$(FIP_FOLDER)/u-boot.bin of=$(FUSING_FOLDER)/u-boot.bin bs=512 skip=96
-	@rm -f $(FIP_FOLDER_SOC)/boot_new.bin
+	@rm -f $(FIP_FOLDER_SOC)/bl2_new.bin $(FIP_FOLDER_SOC)/boot_new.bin
 	@dd if=$(FUSING_FOLDER)/bl1.bin.hardkernel of=$(srctree)/u-boot.bin conv=fsync
 	@dd if=$(FUSING_FOLDER)/bl1.bin.hardkernel of=$(srctree)/u-boot.bin conv=fsync,notrunc bs=512 skip=1 seek=1
 	@dd if=$(FUSING_FOLDER)/u-boot.bin of=$(srctree)/u-boot.bin conv=fsync,notrunc bs=512 seek=97
@@ -1396,6 +1421,9 @@ distclean: mrproper
 		-type f -print | xargs rm -f
 	@rm -f boards.cfg
 	@rm -rf $(buildtree)/*
+	@rm -f $(FIP_FOLDER_SOC)/acs.bin
+	@rm -f $(FIP_FOLDER_SOC)/bl2_acs.bin
+	@rm -f $(FIP_FOLDER_SOC)/bl301.bin
 	@rm -f $(FIP_FOLDER_SOC)/bl33.bin
 	@rm -f $(FIP_FOLDER_SOC)/fip.bin
 	@rm -f $(FIP_FOLDER_SOC)/boot.bin
