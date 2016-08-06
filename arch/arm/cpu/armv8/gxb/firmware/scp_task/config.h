@@ -12,12 +12,14 @@
   * High Priority Task share memory:		1K
   * Low Priority Task share memory:		1k
 */
+#ifndef _CONFIG_H_
+#define _CONFIG_H_
 
-#define CONFIG_RAM_BASE        (0x10000000 + 44 * 1024)
-#define CONFIG_RAM_SIZE         (9 * 1024)
+#define CONFIG_RAM_BASE        (0x10000000 + 41 * 1024)
+#define CONFIG_RAM_SIZE         (12 * 1024)
 #define CONFIG_RAM_END		(CONFIG_RAM_BASE+CONFIG_RAM_SIZE)
 
-#define CONFIG_TASK_STACK_SIZE	1024
+#define CONFIG_TASK_STACK_SIZE	512
 #define TASK_SHARE_MEM_SIZE	1024
 
 /* secure share memory last unsigned are used
@@ -45,6 +47,10 @@
 #define HIGH_TASK_SET_DVFS 0x5
 #define SEC_TASK_GET_WAKEUP_SRC	0x6
 
+#define LOW_TASK_USR_DATA  0x100
+
 	/*bl301 resume to BL30*/
 #define RESPONSE_OK					0x0
 #define RESPONSE_SUSPEND_LEAVE			0x1
+
+#endif//_CONFIG_H_
