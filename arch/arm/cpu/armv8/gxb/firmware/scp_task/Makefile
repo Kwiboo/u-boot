@@ -20,7 +20,7 @@ CFLAGS_WARN=-Wall -Werror -Wundef -Wstrict-prototypes -Wno-trigraphs      \
             -fno-strict-aliasing -fno-common -fomit-frame-pointer         \
             -Werror-implicit-function-declaration -Wno-format-security    \
             -fno-delete-null-pointer-checks -Wdeclaration-after-statement \
-            -Wno-pointer-sign -fno-strict-overflow -fconserve-stack
+            -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -Wno-error=unused-but-set-variable
 CFLAGS_DEBUG=-g
 
 # CPU specific compilation flags
