@@ -851,7 +851,6 @@ u-boot-comp.bin:u-boot.bin
 	cp $< $@
 #	$(objtree)/tools/uclpack $< $@
 
-FUSING_FOLDER := $(srctree)/sd_fuse
 FIP_FOLDER := $(srctree)/fip
 FIP_FOLDER_SOC := $(FIP_FOLDER)/$(SOC)
 FIP_ARGS += --bl30 $(FIP_FOLDER_SOC)/bl30.bin
@@ -864,16 +863,11 @@ FIP_ARGS += --bl32 $(FIP_FOLDER_SOC)/bl32.bin
 endif
 FIP_ARGS += --bl33 $(FIP_FOLDER_SOC)/bl33.bin
 
-.PHONY: fip_create
-fip_create:
-	$(Q)$(MAKE) -C $(srctree)/tools/fip_create/
-	$(Q)cp $(srctree)/tools/fip_create/fip_create $(FIP_FOLDER)/
-
 .PHONY: fip.bin
 ifeq ($(CONFIG_NEED_BL301), y)
-fip.bin: tools prepare acs.bin bl301.bin fip_create
+fip.bin: tools prepare acs.bin bl301.bin
 else
-fip.bin: tools prepare acs.bin fip_create
+fip.bin: tools prepare acs.bin
 endif
 	$(Q)cp u-boot.bin $(FIP_FOLDER_SOC)/bl33.bin
 	$(Q)$(FIP_FOLDER)/fip_create ${FIP_ARGS} $(FIP_FOLDER_SOC)/fip.bin
@@ -909,11 +903,7 @@ ifeq ($(CONFIG_AML_CRYPTO_IMG), y)
 	@cp -f $(FIP_FOLDER_SOC)/boot.img.encrypt $(FIP_FOLDER)/boot.img.encrypt
 endif
 	@cp -f $(FIP_FOLDER_SOC)/u-boot.* $(FIP_FOLDER)/
-	$(Q)dd if=$(FIP_FOLDER)/u-boot.bin of=$(FUSING_FOLDER)/u-boot.bin bs=512 skip=96
 	@rm -f $(FIP_FOLDER_SOC)/bl2_new.bin $(FIP_FOLDER_SOC)/boot_new.bin
-	@dd if=$(FUSING_FOLDER)/bl1.bin.hardkernel of=$(srctree)/u-boot.bin conv=fsync
-	@dd if=$(FUSING_FOLDER)/bl1.bin.hardkernel of=$(srctree)/u-boot.bin conv=fsync,notrunc bs=512 skip=1 seek=1
-	@dd if=$(FUSING_FOLDER)/u-boot.bin of=$(srctree)/u-boot.bin conv=fsync,notrunc bs=512 seek=97
 	@echo '$(FIP_FOLDER_SOC)/u-boot.bin build done!'
 
 #
@@ -1431,10 +1421,7 @@ distclean: mrproper
 	@rm -f $(FIP_FOLDER_SOC)/u-boot.bin
 	@rm -f $(FIP_FOLDER_SOC)/u-boot.bin.* $(FIP_FOLDER_SOC)/*.encrypt
 	@rm -f $(FIP_FOLDER)/u-boot.bin.* $(FIP_FOLDER)/*.bin $(FIP_FOLDER)/*.encrypt
-	@rm -f $(FIP_FOLDER)/fip_create
 	@rm -f $(srctree)/fip/aml_encrypt_gxb
-	@rm -f $(FUSING_FOLDER)/u-boot.bin
-	@$(MAKE) -C $(srctree)/tools/fip_create clean
 
 backup:
 	F=`basename $(srctree)` ; cd .. ; \
