@@ -64,7 +64,7 @@
 
 /* CEC */
 #define CONFIG_CEC_OSD_NAME		"ODROID-C2"
-#define CONFIG_CEC_WAKEUP
+//#define CONFIG_CEC_WAKEUP
 
 /* Serial config */
 #define CONFIG_CONS_INDEX		2

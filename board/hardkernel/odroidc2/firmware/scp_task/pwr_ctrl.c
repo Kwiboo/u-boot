@@ -8,6 +8,8 @@
 
 #ifdef CONFIG_CEC_WAKEUP
 #include <cec_tx_reg.h>
+#else
+typedef unsigned int uint32_t;
 #endif
 
 extern int pwm_voltage_table[31][2];
