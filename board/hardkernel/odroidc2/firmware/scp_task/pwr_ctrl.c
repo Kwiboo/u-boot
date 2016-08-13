@@ -96,15 +96,16 @@ static void power_on_at_clk81(void)
 	power_on_3v3();
 }
 
+/*odroidc2	GPIOAO_13  powr on	:0, power_off	:1*/
 static void power_off_at_24M(void)
 {
 	//LED gpioao_13
-	aml_update_bits(AO_GPIO_O_EN_N, 1<<29, 0);
+	aml_update_bits(AO_GPIO_O_EN_N, 1<<29, 1<<29);
 }
 
 static void power_on_at_24M(void)
 {
-	aml_update_bits(AO_GPIO_O_EN_N, 1<<29, 1<<29);
+	aml_update_bits(AO_GPIO_O_EN_N, 1<<29, 0);
 }
 
 static void power_off_at_32k(void)
@@ -201,7 +202,7 @@ void set_GPIOAO_BIT13(void)
 
 void set_custom_gpio_status(void)
 {
-	set_GPIOAO_BIT13();
+	//set_GPIOAO_BIT13();
 	set_GPIOX_BIT11();
 	set_GPIOX_BIT19();
 	set_GPIOY_BIT14();
