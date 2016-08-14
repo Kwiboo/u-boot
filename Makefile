@@ -873,6 +873,11 @@ endif
 endif
 FIP_ARGS += --bl33 $(FIP_FOLDER_SOC)/bl33.bin
 
+.PHONY: aml_chksum
+aml_chksum:
+	$(Q)$(MAKE) -C $(srctree)/tools/aml_chksum
+	$(Q)cp $(srctree)/tools/aml_chksum/aml_chksum $(FIP_FOLDER_SOC)/
+
 .PHONY: fip.bin
 ifeq ($(CONFIG_NEED_BL301), y)
 fip.bin: tools prepare acs.bin bl301.bin
@@ -910,11 +915,16 @@ bl21.bin: tools prepare u-boot.bin acs.bin
 	$(Q)cp $(buildtree)/board/${BOARDDIR}/firmware/bl21.bin $(FIP_FOLDER_SOC)/bl21.bin -f
 
 .PHONY : boot.bin
-boot.bin: fip.bin
+boot.bin: fip.bin aml_chksum
 ifeq ($(CONFIG_AML_UBOOT_AUTO_TEST), y)
 	$(Q)python $(FIP_FOLDER)/acs_tool.pyc $(FIP_FOLDER_SOC)/bl2_utst.bin $(FIP_FOLDER_SOC)/bl2_acs.bin $(FIP_FOLDER_SOC)/acs.bin 0
 else
-	$(Q)python $(FIP_FOLDER)/acs_tool.pyc $(FIP_FOLDER_SOC)/bl2.bin $(FIP_FOLDER_SOC)/bl2_acs.bin $(FIP_FOLDER_SOC)/acs.bin 0
+	# Remove +512 image offset used for sd-card by replacing
+	# 934:    91080273    add x19, x19, #0x200    // src += 512;
+	# with
+	# 934:    d503201f    nop
+	$(Q)sed 's/\x73\x02\x08\x91/\x1F\x20\x03\xD5/' $(FIP_FOLDER_SOC)/bl2.bin > $(FIP_FOLDER_SOC)/bl2_nop.bin
+	$(Q)python $(FIP_FOLDER)/acs_tool.pyc $(FIP_FOLDER_SOC)/bl2_nop.bin $(FIP_FOLDER_SOC)/bl2_acs.bin $(FIP_FOLDER_SOC)/acs.bin 0
 endif
 	$(Q)$(FIP_FOLDER)/blx_fix.sh \
 		$(FIP_FOLDER_SOC)/bl2_acs.bin \
@@ -954,6 +964,26 @@ ifeq ($(CONFIG_AML_CRYPTO_IMG), y)
 	$(Q)$(FIP_FOLDER_SOC)/aml_encrypt_$(SOC) --imgsig --input $(srctree)/board/$(BOARDDIR)/boot.img --amluserkey $(srctree)/board/$(BOARDDIR)/aml-user-key.sig --output $(FIP_FOLDER_SOC)/boot.img.encrypt
 	@cp -f $(FIP_FOLDER_SOC)/boot.img.encrypt $(FIP_FOLDER)/boot.img.encrypt
 endif
+	# Create u-boot.bin.hardkernel that can be booted from both SD and eMMC
+	#  SD: bl1 uses a 512 offset and expects header+checksum at 528-623 and bl2 at 4608+
+	#  eMMC: bl1 expects header+checksum at 16-111 and bl2 at 4096+
+	#
+	# u-boot.bin.hardkernel layout:
+	#  16-111: eMMC header+checksum (start addr set to 1024)
+	#  528-623: SD header+checksum
+	#  1024-1315: code that copies bl2 from 4608 to 4096
+	#  4608-49151: bl2+bl21
+	#  49152+: bl30+bl301, bl31 and bl33(u-boot)
+	#
+	# Clone u-boot.bin and move bl2 from 4096 to 4608
+	$(Q)dd if=$(FIP_FOLDER_SOC)/u-boot.bin of=$(FIP_FOLDER_SOC)/u-boot.bin.hardkernel bs=512 conv=fsync
+	$(Q)dd if=$(FIP_FOLDER_SOC)/u-boot.bin of=$(FIP_FOLDER_SOC)/u-boot.bin.hardkernel bs=512 seek=9 skip=8 count=87 conv=fsync,notrunc
+	$(Q)dd if=/dev/zero of=$(FIP_FOLDER_SOC)/u-boot.bin.hardkernel bs=512 seek=8 count=1 conv=fsync,notrunc
+	# Add code that copies bl2 from 4608 to 4096
+	$(Q)dd if=$(FIP_FOLDER_SOC)/bl1.bin.hardkernel of=$(FIP_FOLDER_SOC)/u-boot.bin.hardkernel bs=512 seek=2 skip=2 count=1 conv=fsync,notrunc
+	# Write headers with correct offsets and checksums
+	$(Q)$(FIP_FOLDER_SOC)/aml_chksum $(FIP_FOLDER_SOC)/u-boot.bin.hardkernel
+	#
 	@cp -f $(FIP_FOLDER_SOC)/u-boot.* $(FIP_FOLDER)/
 	@rm -f $(FIP_FOLDER_SOC)/bl2_new.bin $(FIP_FOLDER_SOC)/boot_new.bin
 	@echo '$(FIP_FOLDER_SOC)/u-boot.bin build done!'
@@ -1474,6 +1504,8 @@ distclean: mrproper
 	@rm -f $(FIP_FOLDER_SOC)/u-boot.bin.* $(FIP_FOLDER_SOC)/*.encrypt
 	@rm -f $(FIP_FOLDER)/u-boot.bin.* $(FIP_FOLDER)/*.bin $(FIP_FOLDER)/*.encrypt
 	@rm -f $(srctree)/fip/aml_encrypt_gxb
+	@rm -f $(FIP_FOLDER_SOC)/aml_chksum
+	@$(MAKE) -C $(srctree)/tools/aml_chksum clean
 
 backup:
 	F=`basename $(srctree)` ; cd .. ; \
