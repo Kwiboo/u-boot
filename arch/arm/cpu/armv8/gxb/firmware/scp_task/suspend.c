@@ -70,15 +70,15 @@ void enter_suspend(unsigned int suspend_from)
 	p_pwr_op = &pwr_op_d;
 	pwr_op_init(p_pwr_op);
 
-/*
 	// FIXME : (1) BLUE LED GPIOAO_13 (2) Current issue 12*mA -> 7*mA
 #ifdef CONFIG_CEC_WAKEUP
-	hdmi_cec_func_config = readl(P_AO_DEBUG_REG0);
+	hdmi_cec_func_config = readl(P_AO_DEBUG_REG0) & 0xff;
+	wait_uart_empty();
 	uart_puts("CEC cfg:0x");
-	uart_put_hex(hdmi_cec_func_config, 16);
+	uart_put_hex(hdmi_cec_func_config, 8);
 	uart_puts("\n");
+	wait_uart_empty();
 #endif
-*/
 	p_pwr_op->power_off_at_clk81();
 	p_pwr_op->power_off_at_24M();
 
